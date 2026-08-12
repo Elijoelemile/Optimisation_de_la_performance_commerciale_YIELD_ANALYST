@@ -57,17 +57,40 @@ Prérequis : **Python 3.9+** (`python --version` ; sinon
 
 ---
 
+## 🔑 Configuration — Copilote IA (optionnel)
+
+La page **Copilote IA** génère des résumés en langage naturel via l'**API
+Mistral**. C'est une fonctionnalité **optionnelle** : sans clé configurée, le
+reste de l'application fonctionne normalement — les boutons du Copilote sont
+simplement désactivés, avec un message explicatif.
+
+**En local** — créer `.streamlit/secrets.toml` (déjà exclu par `.gitignore`,
+ne jamais le versionner) :
+
+```toml
+MISTRAL_API_KEY = "ta_clé_api_mistral"
+```
+
+**Sur Streamlit Cloud** — ajouter la même clé dans les *Secrets* de l'app
+(page de gestion de l'app → **Settings** → **Secrets**), avec la même syntaxe
+TOML. `secrets.toml` étant local et non versionné, cette étape est nécessaire
+séparément pour que le Copilote fonctionne en ligne.
+
+---
+
 ## 📊 Contenu de l'application
 
 | Page | Contenu |
 |---|---|
 | **Accueil** | KPI globaux + CA par destination et marge par canal. |
 | **Évolution temporelle** | Courbes mensuelles (mesure & axe au choix) + comparaison 2025 vs 2026. |
-| **Destinations** | Tableau, CA / taux de marge, quadrant « pouvoir de prix », heatmap destination × saison. |
-| **Réseaux** *(page phare)* | Créateurs / destructeurs de valeur, utilité (marge vs commission). |
-| **Performance par axe** | Marge par dimension (dont type de produit) + croisement configurable de 2 axes. |
+| **Performance par destination** | Tableau, CA / taux de marge, quadrant « pouvoir de prix », heatmap destination × saison. |
+| **Performance par réseau** *(page phare)* | Créateurs / destructeurs de valeur, utilité (marge vs commission). |
+| **Performance par axe** | Ville de départ et délai de réservation (vues dédiées), marge par dimension au choix, croisement configurable de 2 axes. |
 | **Outil Yield** | Segments à risque, opportunités de hausse de prix, simulateur avec élasticité. |
-| **Recommandations** | Leviers calculés automatiquement + données bonus à demander. |
+| **Système de recommandation** | 4 recommandateurs : réseau ↔ produit (filtrage collaboratif), prix cible par segment, hôtels et compagnies aériennes de substitution (benchmarking). |
+| **Copilote IA** | Résumé en langage naturel de chaque page, généré à la demande via l'API Mistral (voir Configuration ci-dessus). |
+| **Bonus** | Données supplémentaires qui enrichiraient l'analyse (historique des prix, taux d'occupation, etc.). |
 
 Toutes les pages partagent les mêmes **filtres** (saison, destination, canal,
 intensité) et un **agrégateur de performance unique** (`perf_par`) pour des
@@ -143,13 +166,18 @@ versionné) : c'est cette copie que l'app utilise, en local comme en ligne.
 .
 ├── streamlit_app.py            # Point d'entrée de l'app (Accueil / KPI)
 ├── utils.py                    # Fonctions partagées (chargement, filtres, perf)
-├── pages/                      # Les 6 pages d'analyse
+├── pages/                      # Les 8 pages d'analyse
 │   ├── 1_Évolution_temporelle.py
 │   ├── 2_Destinations.py
 │   ├── 3_Réseaux.py
 │   ├── 4_Axes_complémentaires.py
 │   ├── 5_Outil_Yield.py
-│   └── 6_Recommandations.py
+│   ├── 6_Système_de_recommandation.py
+│   ├── 7_Copilote_IA.py
+│   └── 8_Bonus.py
+├── .streamlit/
+│   ├── config.toml             # Thème visuel (versionné)
+│   └── secrets.toml            # Clé API Mistral (local, ignoré par Git)
 ├── data/
 │   └── ng_travel_2025_2026.parquet   # Base PUBLIÉE, lue par l'app (versionnée)
 ├── Data Lake/                        # Base BRUTE (local, ignoré par Git)
@@ -193,12 +221,16 @@ données** en sortie du Data Warehouse.
 
 - La saison **2026 est encore en cours de remplissage** : comparer 2025 vs 2026
   à stade équivalent.
-- Le **simulateur de prix** utilise une élasticité paramétrable mais non mesurée,
-  à calibrer avec des données réelles.
+- Le **simulateur de prix** (Outil Yield) et les **prix cibles** (Système de
+  recommandation) utilisent des hypothèses simplifiées (élasticité non mesurée,
+  volumes supposés intégralement transférables) — des plafonds théoriques à
+  valider avant toute décision, pas des prévisions.
+- Le **Copilote IA** nécessite une clé API Mistral (facultative, coût à la
+  requête) — l'app fonctionne normalement sans elle.
 - **Données bonus** qui enrichiraient l'analyse : historique des prix, taux
   d'occupation hôtelière, prix concurrents, coûts aériens, budget marketing par
   réseau, statut d'annulation.
 
 ---
 
-*Projet réalisé dans le cadre d'un cas pratique de Yield Management — NG Travel.*
+*Projet réalisé dans le cadre d'un cas pratique de Yield Management.*
