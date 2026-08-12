@@ -18,7 +18,54 @@ if len(df_f) == 0:
 
 ORDRES = {"tranche_delai": ORDRE_DELAI, "saison_touristique": ORDRE_SAISON_TOURISTIQUE}
 
-# ============ 1. Performance sur un axe ============
+# ============ 0. Ville de départ & délai de réservation (vues dédiées) ============
+st.subheader("Performance par ville de départ")
+g_ville = perf_par(df_f, "ville_depart").sort_values("marge", ascending=False)
+top_ville = g_ville.head(15)
+cv1, cv2 = st.columns(2)
+with cv1:
+    st.markdown("**Marge nette**")
+    fig = px.bar(top_ville.sort_values("marge"), x="marge", y="ville_depart", orientation="h",
+                 labels={"marge": "Marge nette (€)", "ville_depart": ""})
+    fig.update_layout(height=380, margin=dict(l=0, r=0, t=10, b=0))
+    st.plotly_chart(fig, width="stretch")
+with cv2:
+    st.markdown("**Taux de marge**")
+    fig = px.bar(top_ville.sort_values("marge_pct"), x="marge_pct", y="ville_depart",
+                 orientation="h", color="marge_pct", color_continuous_scale="RdYlGn",
+                 color_continuous_midpoint=0,
+                 labels={"marge_pct": "Taux de marge", "ville_depart": ""})
+    fig.update_xaxes(tickformat=".1%")
+    fig.update_layout(height=380, margin=dict(l=0, r=0, t=10, b=0), coloraxis_showscale=False)
+    st.plotly_chart(fig, width="stretch")
+
+st.divider()
+
+st.subheader("Performance par délai de réservation")
+g_delai = perf_par(df_f, "tranche_delai")
+ordre_delai_present = [d for d in ORDRE_DELAI if d in g_delai["tranche_delai"].values]
+g_delai = g_delai.set_index("tranche_delai").reindex(ordre_delai_present).reset_index()
+cd1, cd2 = st.columns(2)
+with cd1:
+    st.markdown("**Marge nette**")
+    fig = px.bar(g_delai, x="tranche_delai", y="marge",
+                 category_orders={"tranche_delai": ordre_delai_present},
+                 labels={"marge": "Marge nette (€)", "tranche_delai": ""})
+    fig.update_layout(height=360, margin=dict(l=0, r=0, t=10, b=0))
+    st.plotly_chart(fig, width="stretch")
+with cd2:
+    st.markdown("**Taux de marge**")
+    fig = px.bar(g_delai, x="tranche_delai", y="marge_pct",
+                 category_orders={"tranche_delai": ordre_delai_present},
+                 color="marge_pct", color_continuous_scale="RdYlGn", color_continuous_midpoint=0,
+                 labels={"marge_pct": "Taux de marge", "tranche_delai": ""})
+    fig.update_yaxes(tickformat=".1%")
+    fig.update_layout(height=360, margin=dict(l=0, r=0, t=10, b=0), coloraxis_showscale=False)
+    st.plotly_chart(fig, width="stretch")
+
+st.divider()
+
+# ============ 1. Performance sur un axe (configurable) ============
 st.subheader("Performance sur un axe")
 axe = st.selectbox("Axe d'analyse", list(DIMENSIONS.keys()),
                    format_func=lambda c: DIMENSIONS[c], key="_axe_comp")

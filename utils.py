@@ -57,7 +57,9 @@ COULEURS_NAV = [
     {"bg": "#FBE3D6", "text": "#B4502A"},  # 3. Réseaux — terracotta
     {"bg": "#E6F0D6", "text": "#4D6B1F"},  # 4. Axes complémentaires — olivier
     {"bg": "#FBEFD1", "text": "#92650B"},  # 5. Outil Yield — ocre/soleil
-    {"bg": "#F5DCEB", "text": "#8C2D6B"},  # 6. Recommandations — bougainvillier
+    {"bg": "#E0E7FB", "text": "#3730A3"},  # 6. Système de recommandation — indigo
+    {"bg": "#DCE4F5", "text": "#31437A"},  # 7. Copilote IA — bleu nuit
+    {"bg": "#FDECC8", "text": "#9A5B0F"},  # 8. Bonus — miel
 ]
 
 

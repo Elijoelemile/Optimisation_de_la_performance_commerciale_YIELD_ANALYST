@@ -82,9 +82,8 @@ with g2:
 
 st.divider()
 st.info(
-    "🚧 **Squelette** — Cette page d'accueil est fonctionnelle. Les pages "
-    "d'analyse (évolution, destinations, réseaux, axes complémentaires, outil "
-    "Yield, recommandations) sont accessibles dans la barre de navigation à "
-    "gauche et restent à développer.",
-    icon="🚧",
+    "Les pages d'analyse détaillées (évolution, destinations, réseaux, axes "
+    "complémentaires, outil Yield, recommandations) sont accessibles dans la "
+    "barre de navigation à gauche.",
+    icon="🧭",
 )
