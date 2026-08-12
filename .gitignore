@@ -6,6 +6,10 @@ __pycache__/
 venv/
 env/
 
+# Données ETL brutes/raffinées (non versionnées — voir data/ pour la copie publiée)
+Data Lake/
+Data Warehouse/
+
 # OS
 .DS_Store
 Thumbs.db

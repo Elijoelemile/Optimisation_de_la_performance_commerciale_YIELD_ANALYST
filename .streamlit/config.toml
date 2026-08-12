@@ -1,0 +1,7 @@
+[theme]
+# Thème "Méditerranée / Grèce" — cohérent avec NG Travel (tour-opérateur Grèce)
+primaryColor = "#1D6FA5"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#EAF4FB"
+textColor = "#1B2A41"
+font = "sans serif"
