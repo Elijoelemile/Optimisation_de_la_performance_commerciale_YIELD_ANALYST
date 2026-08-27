@@ -30,7 +30,7 @@ from pathlib import Path
 
 import pandas as pd
 
-# Rend les print() ci-dessous robustes aux consoles dont l'encodage ne
+# Rend les éventuels print() robustes aux consoles dont l'encodage ne
 # supporte pas les accents (ex. cp1251) — évite un crash quand `load()` est
 # appelé depuis un process dont le stdout n'est pas UTF-8 (ex. app Streamlit
 # lancée sur une machine dont la console n'est pas en UTF-8).
@@ -39,6 +39,14 @@ for _flux in (sys.stdout, sys.stderr):
         _flux.reconfigure(encoding="utf-8", errors="replace")
     except (AttributeError, ValueError):
         pass
+
+try:
+    from logger_config import get_logger
+except ImportError:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # racine du projet
+    from logger_config import get_logger
+
+log = get_logger(__name__)
 
 
 def _nom_sur(nom: str) -> str:
@@ -69,7 +77,9 @@ def load(
     Retourne la liste des chemins écrits.
     """
     if df is None or len(df) == 0:
-        raise ValueError("Aucune donnée à charger : le DataFrame mémoire est vide.")
+        message = "Aucune donnée à charger : le DataFrame mémoire est vide."
+        log.error(message)
+        raise ValueError(message)
 
     dossier = Path(data_warehouse).expanduser()
     dossier.mkdir(parents=True, exist_ok=True)
@@ -87,13 +97,12 @@ def load(
             cible = dossier / f"{nom}.csv"
             df.to_csv(cible, index=False, encoding="utf-8-sig")
         else:
-            print(f"[LOAD] Format ignoré (non géré) : {fmt}")
+            log.warning("Format ignoré (non géré) : %s", fmt)
             continue
         ecrits.append(cible)
-        print(f"[LOAD] Écrit : {cible}  ({cible.stat().st_size/1024:.0f} Ko)")
+        log.info("Écrit : %s (%.0f Ko)", cible, cible.stat().st_size / 1024)
 
-    print(f"[LOAD] {len(df):,} lignes chargées dans « {dossier} » sous le nom "
-          f"« {nom} ».".replace(",", " "))
+    log.info("%d lignes chargées dans « %s » sous le nom « %s ».", len(df), dossier, nom)
     return ecrits
 
 
@@ -120,9 +129,9 @@ def _cli():
         df = transformation(args.depuis_lake)
         load(df, args.data_warehouse, args.nom, tuple(args.formats), args.horodater)
     else:
-        print("[LOAD] Aucun DataFrame en mémoire (processus isolé).")
-        print("      → Utilise pipeline_etl.py pour l'enchaînement E→T→L en mémoire,")
-        print("        ou relance avec --depuis-lake \"Data Lake\" pour dépanner.")
+        log.warning("Aucun DataFrame en mémoire (processus isolé). "
+                    "Utilise pipeline_orchestrator.py pour l'enchaînement E→T→L en mémoire, "
+                    "ou relance avec --depuis-lake \"Data Lake\" pour dépanner.")
 
 
 if __name__ == "__main__":

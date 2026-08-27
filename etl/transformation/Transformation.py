@@ -2,17 +2,17 @@
 Transformation.py — Étape « T » (Transform) de l'ETL NG Travel
 ===============================================================
 
-Rôle : aller lire la donnée BRUTE dans le Data Lake, la nettoyer et l'enrichir
-(mêmes règles que le script de préparation initial), puis RETOURNER le résultat
-sous forme de DataFrame conservé EN MÉMOIRE (variable Python en RAM).
+Rôle : aller lire la donnée BRUTE dans le Data Lake, la nettoyer et l'enrichir,
+puis RETOURNER le résultat sous forme de DataFrame conservé EN MÉMOIRE
+(variable Python en RAM).
 
 Important — mémoire vs disque
 -----------------------------
 `transformation()` renvoie un DataFrame : tant qu'on reste dans le MÊME
 processus Python, cet objet vit en mémoire et peut être passé directement à
-l'étape Load. C'est ce que fait l'orchestrateur `pipeline_etl.py`.
+l'étape Load. C'est ce que fait l'orchestrateur `pipeline_orchestrator.py`.
 (Deux exécutions séparées de `python X.py` ne partagent pas leur RAM : dans ce
-cas il faudrait un fichier intermédiaire — voir pipeline_etl.py.)
+cas il faudrait un fichier intermédiaire — voir pipeline_orchestrator.py.)
 
 Utilisation en import (dans le pipeline)
 ----------------------------------------
@@ -30,6 +30,15 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+try:
+    from logger_config import get_logger
+except ImportError:
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # racine du projet
+    from logger_config import get_logger
+
+log = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -184,10 +193,12 @@ def _transformer(df: pd.DataFrame) -> pd.DataFrame:
                 "date_resa", "date_depart"}
     manquantes = requises - set(df.columns)
     if manquantes:
-        raise ValueError(
+        message = (
             f"Colonnes attendues absentes après lecture : {sorted(manquantes)}. "
             "Le fichier du Data Lake n'a pas le schéma NG Travel attendu."
         )
+        log.error(message)
+        raise ValueError(message)
 
     # Typage
     df["date_resa"] = pd.to_datetime(df["date_resa"], errors="coerce")
@@ -256,6 +267,26 @@ def _transformer(df: pd.DataFrame) -> pd.DataFrame:
         & df["date_depart"].notna()
         & df["date_resa"].notna()
     )
+
+    # Traçabilité : une seule ligne de log par transformation, quel que soit
+    # l'appelant (pipeline ETL sur disque OU import d'un fichier dans l'app
+    # Streamlit) puisque les deux passent par cette même fonction.
+    nb_invalides = int((~df["valide"]).sum())
+    nb_incoherents = int((~df["coherence_comptable"]).sum())
+    nb_compagnie_manquante = int((df["compagnie"] == LABEL_MANQUANT).sum())
+    nb_aeroport_manquant = int((df["aeroport_depart"] == LABEL_MANQUANT).sum())
+    log.info("Transformation : %d lignes x %d colonnes.", len(df), len(df.columns))
+    if nb_invalides:
+        log.warning("%d dossier(s) invalide(s) détecté(s) (conservés, marqués valide=False).",
+                    nb_invalides)
+    if nb_incoherents:
+        log.warning("%d dossier(s) comptablement incohérent(s) (écart marge > 0,05 €).",
+                    nb_incoherents)
+    if nb_compagnie_manquante:
+        log.info("Compagnie non renseignée sur %d dossier(s).", nb_compagnie_manquante)
+    if nb_aeroport_manquant:
+        log.info("Aéroport de départ non renseigné sur %d dossier(s).", nb_aeroport_manquant)
+
     return df
 
 
@@ -284,11 +315,9 @@ def transformation(
     feuille     : nom de la feuille si le fichier est un Excel.
     """
     chemin = _trouver_dans_lake(data_lake, nom_fichier)
-    print(f"[TRANSFORMATION] Lecture brut : {chemin}")
+    log.info("Lecture brut : %s", chemin)
     brut = _lire_brut(chemin, feuille=feuille)
-    df = _transformer(brut)
-    print(f"[TRANSFORMATION] Terminé : {len(df):,} lignes × {len(df.columns)} colonnes "
-          f"(gardées en mémoire)".replace(",", " "))
+    df = _transformer(brut)  # log déjà émis dans _transformer()
     return df
 
 
@@ -311,7 +340,7 @@ def _cli():
     print(f"Marge nette totale ..... {dfv['marge_nette'].sum():,.0f} €".replace(",", " "))
     print(f"Dossiers déficitaires .. {dfv['dossier_deficitaire'].mean()*100:.1f} %")
     print("\nNote : lancé seul, ce script ne transmet rien à Load (processus séparé).")
-    print("Pour l'enchaînement mémoire E→T→L, utilise pipeline_etl.py.")
+    print("Pour l'enchaînement mémoire E→T→L, utilise pipeline_orchestrator.py.")
 
 
 if __name__ == "__main__":

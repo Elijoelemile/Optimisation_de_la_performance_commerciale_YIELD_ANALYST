@@ -10,6 +10,9 @@ env/
 Data Lake/
 Data Warehouse/
 
+# Logs générés par le gestionnaire de log (logger_config.py) — non versionnés
+log/
+
 # Secrets (clés API) — ne jamais versionner
 .streamlit/secrets.toml
 

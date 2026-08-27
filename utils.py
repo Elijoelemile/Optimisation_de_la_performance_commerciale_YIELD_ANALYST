@@ -20,6 +20,9 @@ import pandas as pd
 import streamlit as st
 
 from etl.transformation.Transformation import transformer_dataframe
+from logger_config import get_logger
+
+log = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constantes d'affichage
@@ -143,6 +146,7 @@ def charger_donnees(chemin: str) -> pd.DataFrame:
     for col in ["date_resa", "date_depart", "mois_depart_periode", "mois_resa_periode"]:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
+    log.info("Base publiée chargée : %s (%d lignes).", chemin, len(df))
     return df
 
 
@@ -156,6 +160,7 @@ def _traiter_fichier_uploade(fichier) -> pd.DataFrame:
     UploadedFile par octets) : ré-uploader le même fichier ne retraite rien.
     """
     nom = fichier.name.lower()
+    log.info("Fichier importé par l'utilisateur : %s", fichier.name)
     if nom.endswith(".csv"):
         brut = pd.read_csv(fichier)
     else:
@@ -165,7 +170,7 @@ def _traiter_fichier_uploade(fichier) -> pd.DataFrame:
             fichier.seek(0)
             brut = pd.read_excel(fichier, sheet_name=0)
 
-    df = transformer_dataframe(brut)
+    df = transformer_dataframe(brut)  # log détaillé déjà émis dans _transformer()
     for col in ["date_resa", "date_depart", "mois_depart_periode", "mois_resa_periode"]:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
@@ -190,6 +195,7 @@ def selecteur_source() -> pd.DataFrame | None:
         try:
             df = _traiter_fichier_uploade(fichier_uploade)
         except Exception as e:
+            log.exception("Échec du traitement du fichier importé « %s ».", fichier_uploade.name)
             st.sidebar.error(f"❌ Impossible de traiter ce fichier : {e}")
             return None
         st.sidebar.success(
@@ -223,10 +229,11 @@ def selecteur_source() -> pd.DataFrame | None:
 
     bases = _lister_bases()
     if not bases:
+        log.warning("Aucune base disponible (ni fichier importé, ni base publiée trouvée).")
         st.sidebar.error(
             "Aucune base trouvée dans « Data Warehouse » et aucun fichier importé.\n\n"
             "Importe un fichier ci-dessus, ou lance d'abord le pipeline ETL :\n"
-            "`python -m pipeline_etl.pipeline_etl <source> --nom ng_travel_2025_2026`"
+            "`python -m pipeline_orchestrator.pipeline_orchestrator <source> --nom ng_travel_2025_2026`"
         )
         return None
 

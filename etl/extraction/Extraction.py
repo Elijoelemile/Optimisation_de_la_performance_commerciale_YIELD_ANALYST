@@ -32,6 +32,14 @@ import argparse
 import shutil
 from pathlib import Path
 
+try:
+    from logger_config import get_logger
+except ImportError:
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # racine du projet
+    from logger_config import get_logger
+
+log = get_logger(__name__)
 
 # Extensions reconnues comme "base de données" source
 EXTENSIONS_VALIDES = {".csv", ".xlsx", ".xls"}
@@ -61,14 +69,17 @@ def trouver_source(chemin: str, pattern: str = "") -> Path:
             and (pattern.lower() in f.name.lower() if pattern else True)
         ]
         if not candidats:
-            raise FileNotFoundError(
+            message = (
                 f"Aucun fichier {sorted(EXTENSIONS_VALIDES)} "
                 f"{f'contenant « {pattern} » ' if pattern else ''}"
                 f"trouvé dans « {p} »."
             )
+            log.error(message)
+            raise FileNotFoundError(message)
         # Le plus récemment modifié (le plus à jour)
         return max(candidats, key=lambda f: f.stat().st_mtime)
 
+    log.error("Chemin introuvable : « %s »", chemin)
     raise FileNotFoundError(f"Chemin introuvable : « {chemin} »")
 
 
@@ -98,9 +109,9 @@ def extraction(
     destination = dossier_lake / (nom if nom else source.name)
     shutil.copy2(source, destination)  # copy2 conserve les métadonnées
 
-    print(f"[EXTRACTION] Source     : {source}")
-    print(f"[EXTRACTION] Déposé dans : {destination}")
-    print(f"[EXTRACTION] Taille      : {destination.stat().st_size / 1024:.0f} Ko")
+    taille_ko = destination.stat().st_size / 1024
+    log.info("Source : %s", source)
+    log.info("Déposé dans : %s (%.0f Ko)", destination, taille_ko)
     return destination
 
 

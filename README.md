@@ -12,6 +12,18 @@ interactif** déployable en ligne.
 
 ---
 
+## 📦 Livrables du projet
+
+Trois documents complémentaires, chacun avec un rôle différent :
+
+| Livrable | Rôle | Emplacement |
+|---|---|---|
+| **Application Streamlit** | Outil interactif, productisé, pour explorer les données et simuler des décisions au quotidien. | `streamlit_app.py` + `pages/` |
+| **Rapport de synthèse (PDF)** | Vue d'ensemble condensée — architecture, traitement des données, KPIs, résultats — pour une lecture rapide. | `docs/Rapport_Projet_NG_Travel.pdf` |
+| **Notebook d'analyse détaillé** | La démarche pas à pas, avec le code, les contrôles qualité et les visualisations commentées — pour comprendre *comment* on arrive aux résultats, pensé pour un public non technique. | `notebooks/Analyse_NG_Travel.ipynb` |
+
+---
+
 ## 🚀 Déploiement sur Streamlit Community Cloud
 
 Le dépôt est prêt à être déployé **sans configuration** (le fichier d'entrée
@@ -98,7 +110,24 @@ indicateurs cohérents partout.
 
 ---
 
-## 🔄 Chaîne ETL (dossiers `etl/`, `pipeline_etl/`, `data_preparation/`)
+## 📤 Importer vos propres données
+
+Dans la barre latérale (« Base de données »), il est possible d'**importer un
+fichier brut** (`.xlsx` ou `.csv`, même schéma que la base NG Travel) à la
+place de la base publiée par défaut :
+
+- le fichier est nettoyé et enrichi **en mémoire**, avec exactement la même
+  fonction de transformation que le pipeline ETL (`transformer_dataframe`,
+  partagée avec `etl/transformation/Transformation.py`) — pas de logique
+  dupliquée ni divergente ;
+- rien n'est écrit sur le serveur (compatible avec un déploiement en ligne,
+  dont le système de fichiers est éphémère) ;
+- la base nettoyée peut ensuite être **téléchargée** directement depuis le
+  navigateur, en `.csv` ou `.xlsx`, via les boutons prévus à cet effet.
+
+---
+
+## 🔄 Chaîne ETL (dossiers `etl/`, `pipeline_orchestrator/`)
 
 Architecture classique : **Data Lake** (brut) → **Data Warehouse** (raffiné).
 
@@ -114,24 +143,73 @@ Source .xlsx ──[etl/extraction/Extraction.py]──▶ Data Lake ──[etl/
   (17 → 41 colonnes), renvoie un DataFrame en mémoire.
 - **`etl/load/Load.py`** — écrit la base transformée dans le Data Warehouse
   (nom au choix).
-- **`pipeline_etl/pipeline_etl.py`** — enchaîne les trois étapes en un seul
-  processus (orchestrateur).
-- **`data_preparation/data_prep.py`** — variante autonome (E+T+L en un seul
-  script) pour préparer rapidement la base sans passer par le pipeline complet.
+- **`pipeline_orchestrator/pipeline_orchestrator.py`** — **orchestrateur** :
+  enchaîne les trois briques de `etl/` ci-dessus en un seul processus, en
+  gardant la donnée en mémoire entre Transform et Load.
 
 Chaque sous-dossier de `etl/` est un package Python (`__init__.py`). Les
 imports entre modules sont donc absolus (`from etl.extraction.Extraction
-import extraction`, etc.) : **`pipeline_etl.py` et `Load.py` doivent être
-lancés avec `-m`, depuis la racine du projet** — pas en exécution directe du
-fichier.
+import extraction`, etc.) : **`pipeline_orchestrator.py` et `Load.py` doivent
+être lancés avec `-m`, depuis la racine du projet** — pas en exécution directe
+du fichier.
 
 Régénérer la base depuis un nouveau fichier source, puis alimenter l'app
 (à lancer depuis la **racine** du projet) :
 
 ```bash
-python -m pipeline_etl.pipeline_etl "/chemin/vers/base_de_données_NG_Travel.xlsx" --nom ng_travel_2025_2026
+python -m pipeline_orchestrator.pipeline_orchestrator "/chemin/vers/base_de_données_NG_Travel.xlsx" --nom ng_travel_2025_2026
 # puis publier la base pour l'app :
 cp "Data Warehouse/ng_travel_2025_2026.parquet" data/
+```
+
+### 📝 Journalisation (`logger_config.py`)
+
+Chaque étape du pipeline (et l'application Streamlit) journalise ses
+événements via un gestionnaire de log centralisé : `logger_config.py`
+(racine du projet). Deux fichiers, dans `log/` (non versionné, généré à
+l'exécution) :
+
+- **`log/ng_travel.log`** — log technique, horodaté et classé par niveau
+  (`INFO` / `WARNING` / `ERROR`), écrit sur la console **et** sur disque
+  (fichier **tournant** : 5 Mo par fichier, 3 fichiers d'historique
+  conservés, les plus anciens purgés automatiquement).
+- **`log/historique_orchestration.log`** — historique **permanent** des
+  exécutions du pipeline ETL (démarrage / succès / échec, une ligne par
+  exécution), jamais tourné ni purgé — notamment alimenté par la tâche
+  planifiée quotidienne (voir ci-dessous).
+
+```python
+from logger_config import get_logger, log_historique
+log = get_logger(__name__)
+log.info("...")
+log_historique("Orchestration terminée avec succès.")
+```
+
+### ⏰ Rafraîchissement automatique quotidien (8h00)
+
+Une tâche planifiée Windows relance le pipeline **tous les jours à 8h00**,
+sans intervention manuelle :
+
+- **`pipeline_orchestrator/tache_quotidienne.py`** — retransforme le fichier
+  déjà présent dans le Data Lake (Transform → Load, pas de nouvelle
+  extraction) et republie le résultat dans `data/` (copie **locale**
+  uniquement — aucun commit/push Git automatique, ça reste une action
+  manuelle et volontaire, comme partout ailleurs dans ce projet).
+- **`pipeline_orchestrator/installer_tache_planifiee.ps1`** — installe la
+  tâche dans le Planificateur de tâches Windows (à exécuter une seule fois) :
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File pipeline_orchestrator\installer_tache_planifiee.ps1
+  ```
+
+Cette tâche ne fonctionne que **localement** (le PC doit être allumé, session
+ouverte, à 8h00 — elle se rattrape au démarrage suivant sinon) : Streamlit
+Cloud n'a pas de mécanisme de tâche planifiée. Chaque exécution — automatique
+ou manuelle (`python -m pipeline_orchestrator.tache_quotidienne`) — est
+journalisée dans `log/historique_orchestration.log`.
+
+Vérifier que la tâche est active :
+```powershell
+Get-ScheduledTask -TaskName "NG Travel - Rafraichissement quotidien"
 ```
 
 ### Les trois emplacements de données (important)
@@ -191,11 +269,16 @@ versionné) : c'est cette copie que l'app utilise, en local comme en ligne.
 │   │   └── Transformation.py
 │   └── load/
 │       └── Load.py
-├── pipeline_etl/
-│   └── pipeline_etl.py               # Orchestrateur E→T→L
-├── data_preparation/
-│   └── data_prep.py                  # Variante autonome (préparation rapide)
+├── pipeline_orchestrator/
+│   ├── pipeline_orchestrator.py        # Orchestrateur E→T→L (enchaîne etl/)
+│   ├── tache_quotidienne.py            # Rafraîchissement quotidien (Transform→Load, 8h)
+│   └── installer_tache_planifiee.ps1   # Installe la tâche planifiée Windows
+├── logger_config.py                   # Gestionnaire de log centralisé (ETL + app)
+├── log/                               # Fichiers de log générés (local, ignoré par Git)
+├── notebooks/
+│   └── Analyse_NG_Travel.ipynb        # Notebook d'exploration détaillée (livrable)
 ├── docs/
+│   ├── Rapport_Projet_NG_Travel.pdf          # Rapport de synthèse (livrable)
 │   └── Dictionnaire_donnees_NG_Travel.xlsx   # Dictionnaire des 41 variables
 ├── requirements.txt
 ├── .gitignore

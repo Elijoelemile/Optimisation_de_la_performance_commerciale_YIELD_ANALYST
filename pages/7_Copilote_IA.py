@@ -11,6 +11,9 @@ except ImportError:
     MISTRAL_DISPONIBLE = False
 
 from utils import setup_page, selecteur_source, filtres_lateraux, fmt_euro, fmt_pct, fmt_int, perf_par, kpis
+from logger_config import get_logger
+
+log = get_logger(__name__)
 
 setup_page("Copilote IA", icon="🤖")
 
@@ -215,14 +218,20 @@ else:
                 st.session_state["_resume_titre"] = nom
                 st.session_state["_resume_texte"] = None
                 st.session_state["_resume_erreur"] = None
+                log.info("Copilote IA : génération demandée pour « %s » (%d dossiers filtrés).",
+                         nom, len(df_f))
                 try:
                     contexte = constructeur_contexte(df_f)
                     with st.spinner(f"Génération du résumé — {nom}…"):
                         texte = generer_resume(client, nom, contexte)
                     st.session_state["_resume_texte"] = texte
+                    log.info("Copilote IA : résumé généré avec succès pour « %s » (%d caractères).",
+                             nom, len(texte))
                 except SDKError as e:
+                    log.error("Copilote IA : erreur API Mistral pour « %s » : %s", nom, e)
                     st.session_state["_resume_erreur"] = f"Erreur API Mistral : {e}"
                 except Exception as e:
+                    log.exception("Copilote IA : erreur inattendue pour « %s ».", nom)
                     st.session_state["_resume_erreur"] = f"Erreur inattendue : {e}"
 
     if st.session_state.get("_resume_titre"):
